@@ -362,7 +362,7 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
         return NULL;
 
     // 파일 크기가 0이거나 매핑 길이가 0 이하인 경우 매핑 실패
-    if (file_length(file) == 0 || length <= 0)
+    if (file_length(file) == 0 || (long)length <= 0)
         return NULL;
 
     // 4. 매핑 작업 처리
