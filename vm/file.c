@@ -28,9 +28,17 @@ vm_file_init (void) {
 bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
-	page->operations = &file_ops;
+	page->operations = &file_ops;   // 페이지에 파일 관련 연산(ops) 설정
 
-	struct file_page *file_page = &page->file;
+	struct file_page *file_page = &page->file;  // 페이지의 file_page 필드 참조
+
+    // aux 구조체를 통해 파일 매핑 정보 설정
+    struct aux *aux = (struct aux *)page->uninit.aux;
+    file_page->file = aux->file;        // 매핑된 파일 객체
+    file_page->offset = aux->offset;    // 파일에서의 시작 위치
+    file_page->page_read_bytes = aux->page_read_bytes;  // 페이지에 읽어올 파일 데이터 크기
+
+    return true;    // 초기화 성공
 }
 
 /* Swap in the page by read contents from the file. */
@@ -49,6 +57,16 @@ file_backed_swap_out (struct page *page) {
 static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+    
+    // 페이지가 수정되었는지 확인
+    if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+        // 수정된 데이터를 파일로 기록
+        file_write_at(file_page->file, page->va, file_page->page_read_bytes, file_page->offset);
+        // 페이지를 수정되지 않은 상태로 설정
+        pml4_set_dirty(thread_current()->pml4, page->va, false);
+    }
+    // 페이지 매핑 제거
+    pml4_clear_page(thread_current()->pml4, page->va);
 }
 
 /* Do the mmap */
