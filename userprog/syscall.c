@@ -356,9 +356,8 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 
 /** Project 3: Memory Mapped Files */
 void munmap (void *addr) {
-
+  do_munmap(addr);
 }
-
 
 /* 페이지 유효성을 검사하는 역할로 제한됨. 검색된 페이지는 반환하지 않음. */
 #ifndef VM
