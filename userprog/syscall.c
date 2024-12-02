@@ -340,9 +340,14 @@ dup2 (int oldfd, int newfd) {
 /** Project 3: Memory Mapped Files */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
     // 1. 입력 파라미터 유효성 검사
-    if (pg_round_down(addr) != addr || is_kernel_vaddr(addr) || addr == NULL || length <= 0 || offset % PGSIZE != 0)
+    if (!addr || pg_round_down(addr) != addr || is_kernel_vaddr(addr) || is_kernel_vaddr(addr + length))
         return NULL;
 
+    // offset이 페이지 정렬되지 않은 경우
+    if (offset != pg_round_down(offset) || offset % PGSIZE != 0)
+        return NULL;
+
+    // 보조 페이지 테이블에 이미 addr에 해당하는 페이지가 등록되어 있는 경우
     if (spt_find_page(&thread_current()->spt, addr))
         return NULL;
 
@@ -354,6 +359,10 @@ void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
     
     // 3. 가져온 파일이 NULL 이거나, 표준 입출력인 경우 매핑 실패
     if ((file >= STDIN && file <= STDERR) || file == NULL)
+        return NULL;
+
+    // 파일 크기가 0이거나 매핑 길이가 0 이하인 경우 매핑 실패
+    if (file_length(file) == 0 || length <= 0)
         return NULL;
 
     // 4. 매핑 작업 처리
