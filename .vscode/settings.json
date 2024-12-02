@@ -14,6 +14,8 @@
         "*.inc": "c",
         "syscall-nr.h": "c",
         "syscall.h": "c",
-        "interrupt.h": "c"
+        "interrupt.h": "c",
+        "malloc.h": "c",
+        "process.h": "c"
     }
 }

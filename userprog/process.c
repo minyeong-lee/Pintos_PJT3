@@ -172,8 +172,8 @@ __do_fork (void *aux) {
 
   process_activate (curr);
 #ifdef VM
-	supplemental_page_table_init (&current->spt);
-	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+	supplemental_page_table_init (&curr->spt);
+	if (!supplemental_page_table_copy (&curr->spt, &parent->spt))
 		goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
@@ -428,7 +428,7 @@ struct ELF64_PHDR {
 #define ELF ELF64_hdr
 #define Phdr ELF64_PHDR
 
-static bool setup_stack (struct intr_frame *if_);
+bool setup_stack (struct intr_frame *if_);
 static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
@@ -718,6 +718,28 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct container *container = aux;		// `aux`를 통해 전달된 container 구조체
+    struct file *file = container->file;	// 파일 핸들
+    off_t offset = container->offset;		// 파일의 읽기 시작 위치
+    size_t page_read_bytes = container->page_read_bytes;	// 읽을 바이트 수
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;	// 나머지 부분은 0으로 초기화
+
+	// 파일을 지정된 오프셋으로 이동
+	file_seek(file, offset); 
+
+	// 파일 데이터를 페이지의 물리 메모리로 읽기
+    if (file_read(file, page->frame->kva, page_read_bytes) != (off_t)page_read_bytes) { 
+		// 읽기 실패 시 메모리 해제 후 false 반환
+        palloc_free_page(page->frame->kva);                                       
+		
+		// 제대로 못 읽었다면 free시키고 false 리턴
+        return false;
+    }
+
+	// 페이지의 나머지 부분을 0으로 채우기
+    memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes); 
+
+    return true;	// 성공적으로 데이터 로드
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -737,41 +759,75 @@ lazy_load_segment (struct page *page, void *aux) {
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+	// 페이지 크기와 정렬 확인
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
 
+	// 읽기와 0 초기화 작업이 끝날 때까지 반복
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
+		// page_read_bytes: 파일에서 읽어올 바이트 수
+		// page_zero_bytes: 나머지 페이지를 0으로 초기화할 바이트 수
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
+		/** Project 3: Anonymous Page - Container 생성  */
+        struct container *container = (struct container *)malloc(sizeof(struct container));
+
+		if (container == NULL) {
+            return false; // 메모리 할당 실패 처리
+        }
+
+        container->file = file;
+        container->offset = ofs;
+        container->page_read_bytes = page_read_bytes;
+
+        /** Project 3: Anonymous Page - aux 대신 container 삽입 */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, container)){
+			free(container); // 페이지 등록 실패 시 메모리 해제
 			return false;
+					}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+
+		/** Project 3: Anonymous Page - page_read_bytes 만큼 offset */
+        ofs += page_read_bytes;
 	}
 	return true;
 }
 
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
-static bool
+bool
 setup_stack (struct intr_frame *if_) {
 	bool success = false;
+
+	// 스택의 바닥 주소를 계산 (스택은 PGSIZE 크기만큼 할당)
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {   // 스택 페이지를 VM_MARKER_0으로 표시
+		// 페이지를 할당하여 실제 메모리에 매핑
+        success = vm_claim_page(stack_bottom);
+
+        if (success) {
+			// rsp 레지스터를 사용자 스택의 최상단으로 설정
+            if_->rsp = USER_STACK;
+
+			// 현재 스레드의 stack_bottom을 갱신
+            thread_current()->stack_bottom = stack_bottom;
+        }
+    }
 
 	return success;
 }

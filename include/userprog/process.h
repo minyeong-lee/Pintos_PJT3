@@ -13,4 +13,12 @@ void process_activate (struct thread *next);
 /* Project 2 - Argument Passing */
 static void argument_passing (struct intr_frame *if_, int argv_cnt, char **argv_list);
 
+/** Project 3: Anonymous Page */
+struct container{
+    struct file *file;
+    off_t offset;
+    size_t page_read_bytes;
+};
+
+
 #endif /* userprog/process.h */

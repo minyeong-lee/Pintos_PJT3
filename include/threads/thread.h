@@ -132,7 +132,11 @@ struct thread {
 #endif
 #ifdef VM
   /* Table for whole virtual memory owned by thread. */
-  struct supplemental_page_table spt;
+  struct supplemental_page_table spt; // 현재 스레드가 소유한 가상 메모리의 보조 페이지 테이블
+
+  /** Project 3: Anonymous Page - stack용 포인터 생성*/
+  void *stack_bottom;   // 현재 스택의 바닥 주소 (스택의 끝)
+  void *stack_pointer;  // 현재 스택의 포인터 (스택의 맨 위 주소)
 #endif
 
 	/* Owned by thread.c. */

@@ -1,7 +1,9 @@
 #ifndef VM_VM_H
 #define VM_VM_H
+#include <hash.h>
 #include <stdbool.h>
 #include "threads/palloc.h"
+
 
 enum vm_type {
 	/* page not initialized */
@@ -27,6 +29,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -35,6 +38,7 @@ struct page_operations;
 struct thread;
 
 #define VM_TYPE(type) ((type) & 7)
+#define STACK_LIMIT (USER_STACK - (1 << 20)) // 1MB 제한
 
 /* The representation of "page".
  * This is kind of "parent class", which has four "child class"es, which are
@@ -46,6 +50,9 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	/* proejct3 - Virtual Memory */
+	struct hash_elem hash_elem; // spt에서 페이지를 관리하고 탐색하는 해시 테이블 요소
+	bool writable;		// 페이지가 쓰기 가능한지 여부
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -61,8 +68,14 @@ struct page {
 
 /* The representation of "frame" */
 struct frame {
-	void *kva;
-	struct page *page;
+    void *kva;               // 커널 가상 주소 (Kernel Virtual Address)
+    struct page *page;       // 프레임에 매핑된 페이지를 참조
+
+    /** 
+     * Project 3: Memory Management - 리스트 객체 추가 
+     * frame_elem은 프레임을 리스트로 관리하기 위한 리스트 요소
+     */
+    struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
@@ -85,6 +98,9 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	/* project3 - Memory Management */
+	
+	struct hash spt_hash; // spt를 해시 테이블로 구현
 };
 
 #include "threads/thread.h"

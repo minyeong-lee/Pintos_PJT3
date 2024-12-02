@@ -17,13 +17,22 @@ typedef int off_t;
 /* Maximum characters in a filename written by readdir(). */
 #define READDIR_MAX_LEN 14
 
+/* project3- Anonymous Page */
+#ifndef VM
+void check_addr(void *addr);
+#else
+struct page *check_addr(void *addr);
+#endif
+
+/** Project 3: Memory Mapped Files */
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
+
 /* Typical return values from main() and arguments to exit(). */
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
 
 struct lock filesys_lock;
-
-static void check_addr(const char *f_addr);
 
 static void halt (void) NO_RETURN;
 void exit (int status) NO_RETURN;

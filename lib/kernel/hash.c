@@ -8,16 +8,15 @@
 #include "hash.h"
 #include "../debug.h"
 #include "threads/malloc.h"
+#include "vm/vm.h"
 
-#define list_elem_to_hash_elem(LIST_ELEM)                       \
-	list_entry(LIST_ELEM, struct hash_elem, list_elem)
+#define list_elem_to_hash_elem(LIST_ELEM) list_entry(LIST_ELEM, struct hash_elem, list_elem)
 
-static struct list *find_bucket (struct hash *, struct hash_elem *);
-static struct hash_elem *find_elem (struct hash *, struct list *,
-		struct hash_elem *);
-static void insert_elem (struct hash *, struct list *, struct hash_elem *);
-static void remove_elem (struct hash *, struct hash_elem *);
-static void rehash (struct hash *);
+static struct list *find_bucket(struct hash *, struct hash_elem *);
+static struct hash_elem *find_elem(struct hash *, struct list *, struct hash_elem *);
+static void insert_elem(struct hash *, struct list *, struct hash_elem *);
+static void remove_elem(struct hash *, struct hash_elem *);
+static void rehash(struct hash *);
 
 /* Initializes hash table H to compute hash values using HASH and
    compare hash elements using LESS, given auxiliary data AUX. */
@@ -392,3 +391,27 @@ remove_elem (struct hash *h, struct hash_elem *e) {
 	list_remove (&e->list_elem);
 }
 
+/** Project 3: Memory Management - 해시 인덱스 리턴 */
+uint64_t hash_func(const struct hash_elem *e, void *aux) {
+	// hash_entry 매크로를 사용해 hash_elem에서 struct page 구조체를 가져옴
+    const struct page *p = hash_entry(e, struct page, hash_elem);
+
+    return hash_bytes(&p->va, sizeof(p->va));
+}
+
+/** Project 3: Memory Management - 오름차순 정렬 */
+bool less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+	// hash_entry를 사용하여 hash_elem에서 struct page를 추출
+	const struct page *pa = hash_entry(a, struct page, hash_elem);
+	const struct page *pb = hash_entry(b, struct page, hash_elem);
+
+	// 가상 주소를 비교하여 결과를 반환
+    return pa->va < pb->va;
+}
+
+/** Project 3: Anonymous Page - 해시 파괴 */
+void hash_destructor(struct hash_elem *e, void *aux) {
+    const struct page *p = hash_entry(e, struct page, hash_elem);
+	destroy(p);
+    free(p);
+}

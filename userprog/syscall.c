@@ -120,6 +120,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
       f->R.rax = dup2(f->R.rdi, f->R.rsi);
       break;
 
+    case SYS_MMAP:
+      f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+      break;
+
+    case SYS_MUNMAP:
+      munmap(f->R.rdi);
+      break;
+
     default:
       printf("system call!\n");
       thread_exit ();
@@ -328,8 +336,36 @@ dup2 (int oldfd, int newfd) {
   return newfd;
 }
 
-static void
-check_addr (const char *f_addr) {
-  if (!is_user_vaddr(f_addr) || f_addr == NULL || !pml4_get_page(thread_current()->pml4, f_addr))
-    exit(-1);
+
+/** Project 3: Memory Mapped Files */
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+
 }
+
+/** Project 3: Memory Mapped Files */
+void munmap (void *addr) {
+
+}
+
+
+/* 페이지 유효성을 검사하는 역할로 제한됨. 검색된 페이지는 반환하지 않음. */
+#ifndef VM
+void check_addr (void *addr) {
+  if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr->pml4, addr) == NULL)
+    exit(-1);
+
+  return spt_find_page(&curr->spt, addr);
+}
+/* 페이지 검색 결과(struct page *)를 반환. */
+#else
+/** #Project 3: Anonymous Page */
+struct page* check_addr(void *addr) {
+    struct thread *curr = thread_current();
+
+    if (is_kernel_vaddr(addr) || addr == NULL)
+        exit(-1);
+
+    return spt_find_page(&curr->spt, addr);
+}
+#endif
+

@@ -97,4 +97,12 @@ uint64_t hash_bytes (const void *, size_t);
 uint64_t hash_string (const char *);
 uint64_t hash_int (int);
 
+/** Project 3: Memory Management 함수 선언 */
+uint64_t hash_func(const struct hash_elem *e, void *aux);
+bool less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+void action_func(struct hash_elem *e, void *aux);
+
+/** Project 3: Anonymous Page */
+void hash_destructor(struct hash_elem *e, void *aux);
+
 #endif /* lib/kernel/hash.h */

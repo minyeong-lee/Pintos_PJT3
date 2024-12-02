@@ -27,10 +27,20 @@ vm_anon_init (void) {
 /* Initialize the file mapping */
 bool
 anon_initializer (struct page *page, enum vm_type type, void *kva) {
-	/* Set up the handler */
+
+	// 페이지가 초기화되지 않은 상태에서만 호출되어야 하므로, uninit_page 데이터를 0으로 초기화
+    struct uninit_page *uninit = &page->uninit;
+    memset(uninit, 0, sizeof(struct uninit_page));
+
+	// 페이지의 operations 포인터를 익명 페이지 전용 핸들러로 설정
 	page->operations = &anon_ops;
 
+	// 익명 페이지 데이터를 초기화
 	struct anon_page *anon_page = &page->anon;
+
+	// TODO: 추가적인 초기화 로직 필요 (예: 스왑 슬롯 설정 등)
+
+	return true;
 }
 
 /* Swap in the page by read contents from the swap disk. */
