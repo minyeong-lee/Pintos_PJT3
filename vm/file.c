@@ -140,18 +140,9 @@ do_munmap (void *addr) {
 		// 페이지의 초기화 정보(aux)를 가져옴
         struct aux *aux = (struct aux *)page->uninit.aux;
 
-        // 페이지가 수정되었는지 확인
-        if (pml4_is_dirty(curr->pml4, page->va)) {
-			// 수정된 데이터를 파일에 쓰기
-            file_write_at(aux->file, addr, aux->page_read_bytes, aux->offset);
-			// 수정 상태 초기화
-            pml4_set_dirty(curr->pml4, page->va, false);
-        }
-		
-		// 페이지 매핑 해제
-        pml4_clear_page(curr->pml4, page->va);
-
-        destroy(page);
+        // 페이지가 수정되었는지 확인 여부에 따라 file에 쓰고 지운다.
+        if(page)
+            destroy(page);
         // 다음 페이지로 이동
         addr += PGSIZE;
     }
