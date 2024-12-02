@@ -318,20 +318,26 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct
         if (src_page->operations->type == VM_UNINIT) {  
             if (!vm_alloc_page_with_initializer(src_type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux))
                 return false;
+		}
+		else if(src_type == VM_ANON){
+			if (!vm_alloc_page(src_type, src_page->va, src_page->writable))  // uninit 페이지로 생성 및 초기화
+                return false;
 
-            continue;
-        }
+            if (!vm_claim_page(src_page->va))  // 물리 메모리와 매핑하고 initialize 한다
+                return false;
 
-		// FILE 타입 페이지 복사
-        if (src_type == VM_FILE) { 
-            struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
+            // 대응하는 물리 메모리 데이터 복제
+            struct page *dst_page = spt_find_page(dst, src_page->va);
+            memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+		} else if (src_type == VM_FILE){
+			struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
 
 			// 파일 매핑 관련 정보 복사
             aux->file = src_page->file.file;
             aux->offset = src_page->file.offset;
             aux->page_read_bytes = src_page->file.page_read_bytes;
 
-            if (!vm_alloc_page_with_initializer(src_type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux))
+            if (!vm_alloc_page_with_initializer(src_type, src_page->va, src_page->writable, NULL, src_page->uninit.aux))
                 return false;
 
 			// 목적지 페이지 초기화 및 매핑
@@ -339,21 +345,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct
             file_backed_initializer(dst_page, src_type, NULL);	// 파일 초기화
             dst_page->frame = src_page->frame;	// 프레임 매핑 복사
             pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, src_page->writable);
-
-            continue;
-        }
-
-        // ANON 타입 페이지 복사
-        if (!vm_alloc_page(src_type, src_page->va, src_page->writable))  
-            return false;
-
-        if (!vm_claim_page(src_page->va)) 
-            return false;
-			
-        // 물리 메모리 데이터 복사
-        struct page *dst_page = spt_find_page(dst, src_page->va);
-        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
-    }
+		}
+	}
 
     return true;
 }
