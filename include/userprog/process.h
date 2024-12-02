@@ -20,6 +20,9 @@ struct container{
     size_t page_read_bytes;
 };
 
+/** #Project 3: Memory Mapped Files */
+bool lazy_load_segment(struct page *page, void *aux);
+
 #define STDIN 1
 #define STDOUT 2
 #define STDERR 3
