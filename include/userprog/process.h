@@ -13,6 +13,9 @@ void process_activate (struct thread *next);
 /* Project 2 - Argument Passing */
 static void argument_passing (struct intr_frame *if_, int argv_cnt, char **argv_list);
 
+/* project2 - System call */
+struct file *process_get_file(int fd);
+
 /** Project 3: Anonymous Page */
 struct aux{
     struct file *file;

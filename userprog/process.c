@@ -708,6 +708,16 @@ install_page (void *upage, void *kpage, bool writable) {
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
 
+/** #Project 2: System Call - 현재 스레드의 fd번째 파일 정보 얻기 */
+struct file *process_get_file(int fd) {
+    thread *curr = thread_current();
+
+    if (fd < 0 || fd >= FD_COUNT_LIMIT)
+        return NULL;
+
+    return curr->fdt[fd];
+}
+
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
@@ -776,7 +786,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		/** Project 3: Anonymous Page - Container 생성  */
-        struct aus *aux = (struct aux *)malloc(sizeof(struct aux));
+        struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
 
 		if (aux == NULL) {
             return false; // 메모리 할당 실패 처리

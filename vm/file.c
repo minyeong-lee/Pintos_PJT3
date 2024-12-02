@@ -78,13 +78,13 @@ do_mmap (void *addr, size_t length, int writable,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		// 페이지 초기화 정보를 담을 container 생성
-        struct container *container = (struct container *)malloc(sizeof(struct container));
-        container->file = file;
-        container->offset = offset;
-        container->page_read_bytes = page_read_bytes;
+        struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
+        aux->file = file;
+        aux->offset = offset;
+        aux->page_read_bytes = page_read_bytes;
 
 		// 페이지를 할당하고 초기화 정보와 함께 SPT 등록
-        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, container))
+        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, aux))
             return false;
 
 		// 읽을 바이트와 남은 바이트 계산

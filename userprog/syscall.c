@@ -340,11 +340,17 @@ dup2 (int oldfd, int newfd) {
 /** Project 3: Memory Mapped Files */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
     // 1. 입력 파라미터 유효성 검사
-    if (check_address(addr) || pg_round_down(addr) != addr || length <= 0 || writable == 0 || offset % PGSIZE != 0)
+    if (pg_round_down(addr) != addr || is_kernel_vaddr(addr) || addr == NULL || length <= 0 || offset % PGSIZE != 0)
+        return NULL;
+
+    if (spt_find_page(&thread_current()->spt, addr))
         return NULL;
 
     // 2. 파일 디스크립터로부터 파일 가져오기
-    struct file *file = process_get_file(fd);
+    struct thread *curr = thread_current ();
+    if (fd < 0 || fd >= FD_COUNT_LIMIT)
+        return NULL;
+    struct file *file = curr->fd_table[fd];
     
     // 3. 가져온 파일이 NULL 이거나, 표준 입출력인 경우 매핑 실패
     if ((file >= STDIN && file <= STDERR) || file == NULL)
