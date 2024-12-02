@@ -339,15 +339,18 @@ dup2 (int oldfd, int newfd) {
 
 /** Project 3: Memory Mapped Files */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
-  // addr은 페이지 시작 주소여야 함. length가 음수거나 쓰기 불가능한 영역도 불가능.
-    if (check_addr(addr) || pg_round_down(addr) != addr || length <= 0 || writable == 0 || offset % PGSIZE != 0)
+    // 1. 입력 파라미터 유효성 검사
+    if (check_address(addr) || pg_round_down(addr) != addr || length <= 0 || writable == 0 || offset % PGSIZE != 0)
         return NULL;
 
+    // 2. 파일 디스크립터로부터 파일 가져오기
     struct file *file = process_get_file(fd);
-
+    
+    // 3. 가져온 파일이 NULL 이거나, 표준 입출력인 경우 매핑 실패
     if ((file >= STDIN && file <= STDERR) || file == NULL)
         return NULL;
 
+    // 4. 매핑 작업 처리
     return do_mmap(addr, length, writable, file, offset);
 }
 
@@ -361,7 +364,7 @@ void munmap (void *addr) {
 #ifndef VM
 void check_addr (void *addr) {
   if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr->pml4, addr) == NULL)
-    exit(-1);
+    exit(-1); 
 }
 
 /* 페이지 검색 결과(struct page *)를 반환. */
