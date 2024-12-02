@@ -5,6 +5,8 @@
 #include <debug.h>
 #include <stddef.h>
 #include "threads/thread.h"
+#include <stddef.h>
+#include "filesys/off_t.h"
 
 /* Process identifier. */
 typedef int pid_t;
