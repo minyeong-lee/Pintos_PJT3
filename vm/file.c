@@ -5,6 +5,7 @@
 /** Project 3: Memory Mapped Files */
 #include "threads/vaddr.h"
 #include "userprog/process.h"
+#include "threads/mmu.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -101,23 +102,31 @@ do_mmap (void *addr, size_t length, int writable,
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+	// 현재 스레드 가져오기
 	struct thread *curr = thread_current();
 
     while (1) {
+		// 현재 주소에 해당하는 페이지 찾음
         struct page *page = spt_find_page(&curr->spt, addr);
 
+		// 페이지가 없으면 루프 종료
         if (page == NULL)
             break;
 
+		// 페이지의 초기화 정보(aux)를 가져옴
         struct aux *aux = (struct aux *)page->uninit.aux;
 
-        // 수정되었는지 확인해서 수정되었다면 file에 쓰고 비운다.
+        // 페이지가 수정되었는지 확인
         if (pml4_is_dirty(curr->pml4, page->va)) {
+			// 수정된 데이터를 파일에 쓰기
             file_write_at(aux->file, addr, aux->page_read_bytes, aux->offset);
+			// 수정 상태 초기화
             pml4_set_dirty(curr->pml4, page->va, false);
         }
-
+		
+		// 페이지 매핑 해제
         pml4_clear_page(curr->pml4, page->va);
+		// 다음 페이지로 이동
         addr += PGSIZE;
     }
 }
