@@ -84,10 +84,12 @@ do_mmap (void *addr, size_t length, int writable,
         aux->page_read_bytes = page_read_bytes;
 
 		// 페이지를 할당하고 초기화 정보와 함께 SPT 등록
-        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, aux))
+        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, aux)){
+            free(aux);
             return false;
+        }
 
-		// 읽을 바이트와 남은 바이트 계산
+        // 읽을 바이트와 남은 바이트 계산
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
 
@@ -126,7 +128,9 @@ do_munmap (void *addr) {
 		
 		// 페이지 매핑 해제
         pml4_clear_page(curr->pml4, page->va);
-		// 다음 페이지로 이동
+
+        destroy(page);
+        // 다음 페이지로 이동
         addr += PGSIZE;
     }
 }
