@@ -83,7 +83,7 @@ do_mmap (void *addr, size_t length, int writable,
         container->page_read_bytes = page_read_bytes;
 
 		// 페이지를 할당하고 초기화 정보와 함께 SPT 등록
-        if (!vm_alloc_page_with_initializer(VM_ANON, addr, writable, lazy_load_segment, container))
+        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, container))
             return false;
 
 		// 읽을 바이트와 남은 바이트 계산
