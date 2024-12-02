@@ -20,5 +20,8 @@ struct container{
     size_t page_read_bytes;
 };
 
+#define STDIN 1
+#define STDOUT 2
+#define STDERR 3
 
 #endif /* userprog/process.h */

@@ -339,7 +339,16 @@ dup2 (int oldfd, int newfd) {
 
 /** Project 3: Memory Mapped Files */
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+  // addr은 페이지 시작 주소여야 함. length가 음수거나 쓰기 불가능한 영역도 불가능.
+    if (check_addr(addr) || pg_round_down(addr) != addr || length <= 0 || writable == 0 || offset % PGSIZE != 0)
+        return NULL;
 
+    struct file *file = process_get_file(fd);
+
+    if ((file >= STDIN && file <= STDERR) || file == NULL)
+        return NULL;
+
+    return do_mmap(addr, length, writable, file, offset);
 }
 
 /** Project 3: Memory Mapped Files */
@@ -353,9 +362,8 @@ void munmap (void *addr) {
 void check_addr (void *addr) {
   if (is_kernel_vaddr(addr) || addr == NULL || pml4_get_page(curr->pml4, addr) == NULL)
     exit(-1);
-
-  return spt_find_page(&curr->spt, addr);
 }
+
 /* 페이지 검색 결과(struct page *)를 반환. */
 #else
 /** #Project 3: Anonymous Page */
