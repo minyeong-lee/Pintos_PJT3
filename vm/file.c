@@ -101,7 +101,7 @@ do_mmap (void *addr, size_t length, int writable,
 
 		// 페이지 초기화 정보를 담을 container 생성
         struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
-        aux->file = file;
+        aux->file = mfile;
         aux->offset = offset;
         aux->page_read_bytes = page_read_bytes;
 
