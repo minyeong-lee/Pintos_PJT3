@@ -718,10 +718,10 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-	struct aux *aux *container = aux;		// `aux`를 통해 전달된 container 구조체
-    struct file *file = aux->file;	// 파일 핸들
-    off_t offset = aux->offset;		// 파일의 읽기 시작 위치
-    size_t page_read_bytes = aux->page_read_bytes;	// 읽을 바이트 수
+	struct aux *aux_p = aux;		// `aux`를 통해 전달된 container 구조체
+    struct file *file = aux_p->file;	// 파일 핸들
+    off_t offset = aux_p->offset;		// 파일의 읽기 시작 위치
+    size_t page_read_bytes = aux_p->page_read_bytes;	// 읽을 바이트 수
     size_t page_zero_bytes = PGSIZE - page_read_bytes;	// 나머지 부분은 0으로 초기화
 
 	// 파일을 지정된 오프셋으로 이동
