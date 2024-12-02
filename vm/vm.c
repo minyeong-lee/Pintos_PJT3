@@ -312,24 +312,26 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct
     hash_first(&iter, &src->spt_hash);
     while (hash_next(&iter)) {
         struct page *src_page = hash_entry(hash_cur(&iter), struct page, hash_elem);
-		enum vm_type src_type = page_get_type(src_page);
+		enum vm_type type = src_page->operations->type;
+		void *upage = src_page->va;
+        bool writable = src_page->writable;
 
 		// UNINIT 타입 페이지 복사 
-        if (src_page->operations->type == VM_UNINIT) {  
-            if (!vm_alloc_page_with_initializer(src_type, src_page->va, src_page->writable, src_page->uninit.init, src_page->uninit.aux))
-                return false;
+        if (type == VM_UNINIT) {  
+			void *aux = src_page->uninit.aux;
+            vm_alloc_page_with_initializer(page_get_type(src_page), upage, writable, src_page->uninit.init, aux);
 		}
-		else if(src_type == VM_ANON){
-			if (!vm_alloc_page(src_type, src_page->va, src_page->writable))  // uninit 페이지로 생성 및 초기화
+		else if(type == VM_ANON){
+			if (!vm_alloc_page(type, upage, writable))  // uninit 페이지로 생성 및 초기화
                 return false;
 
-            if (!vm_claim_page(src_page->va))  // 물리 메모리와 매핑하고 initialize 한다
+            if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize 한다
                 return false;
 
             // 대응하는 물리 메모리 데이터 복제
-            struct page *dst_page = spt_find_page(dst, src_page->va);
+            struct page *dst_page = spt_find_page(dst, upage);
             memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
-		} else if (src_type == VM_FILE){
+		} else if (type == VM_FILE){
 			struct aux *aux = (struct aux *)malloc(sizeof(struct aux));
 
 			// 파일 매핑 관련 정보 복사
@@ -337,12 +339,12 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED, struct
             aux->offset = src_page->file.offset;
             aux->page_read_bytes = src_page->file.page_read_bytes;
 
-            if (!vm_alloc_page_with_initializer(src_type, src_page->va, src_page->writable, NULL, src_page->uninit.aux))
+            if (!vm_alloc_page_with_initializer(type, src_page->va, src_page->writable, NULL, src_page->uninit.aux))
                 return false;
 
 			// 목적지 페이지 초기화 및 매핑
-            struct page *dst_page = spt_find_page(dst, src_page->va);
-            file_backed_initializer(dst_page, src_type, NULL);	// 파일 초기화
+            struct page *dst_page = spt_find_page(dst, upage);
+            file_backed_initializer(dst_page, type, NULL);	// 파일 초기화
             dst_page->frame = src_page->frame;	// 프레임 매핑 복사
             pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, src_page->writable);
 		}
