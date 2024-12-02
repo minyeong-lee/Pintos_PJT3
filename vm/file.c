@@ -101,4 +101,23 @@ do_mmap (void *addr, size_t length, int writable,
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+	struct thread *curr = thread_current();
+
+    while (1) {
+        struct page *page = spt_find_page(&curr->spt, addr);
+
+        if (page == NULL)
+            break;
+
+        struct aux *aux = (struct aux *)page->uninit.aux;
+
+        // 수정되었는지 확인해서 수정되었다면 file에 쓰고 비운다.
+        if (pml4_is_dirty(curr->pml4, page->va)) {
+            file_write_at(aux->file, addr, aux->page_read_bytes, aux->offset);
+            pml4_set_dirty(curr->pml4, page->va, false);
+        }
+
+        pml4_clear_page(curr->pml4, page->va);
+        addr += PGSIZE;
+    }
 }

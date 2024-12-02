@@ -718,10 +718,10 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-	struct container *container = aux;		// `aux`를 통해 전달된 container 구조체
-    struct file *file = container->file;	// 파일 핸들
-    off_t offset = container->offset;		// 파일의 읽기 시작 위치
-    size_t page_read_bytes = container->page_read_bytes;	// 읽을 바이트 수
+	struct aux *aux *container = aux;		// `aux`를 통해 전달된 container 구조체
+    struct file *file = aux->file;	// 파일 핸들
+    off_t offset = aux->offset;		// 파일의 읽기 시작 위치
+    size_t page_read_bytes = aux->page_read_bytes;	// 읽을 바이트 수
     size_t page_zero_bytes = PGSIZE - page_read_bytes;	// 나머지 부분은 0으로 초기화
 
 	// 파일을 지정된 오프셋으로 이동
@@ -776,20 +776,20 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		/** Project 3: Anonymous Page - Container 생성  */
-        struct container *container = (struct container *)malloc(sizeof(struct container));
+        struct aus *aux = (struct aux *)malloc(sizeof(struct aux));
 
-		if (container == NULL) {
+		if (aux == NULL) {
             return false; // 메모리 할당 실패 처리
         }
 
-        container->file = file;
-        container->offset = ofs;
-        container->page_read_bytes = page_read_bytes;
+        aux->file = file;
+        aux->offset = ofs;
+        aux->page_read_bytes = page_read_bytes;
 
         /** Project 3: Anonymous Page - aux 대신 container 삽입 */
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, container)){
-			free(container); // 페이지 등록 실패 시 메모리 해제
+					writable, lazy_load_segment, aux)){
+			free(aux); // 페이지 등록 실패 시 메모리 해제
 			return false;
 					}
 
