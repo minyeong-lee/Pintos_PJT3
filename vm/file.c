@@ -71,6 +71,10 @@ do_mmap (void *addr, size_t length, int writable,
     size_t read_bytes = (length > file_length(file)) ? file_length(file) : length;
     size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 
+    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0); // 매핑해야할 바이트가 페이지 크기의 배수인지 확인
+    ASSERT(pg_ofs(addr) == 0);  // 매핑 시작 주소가 페이지 시작 주소인지 확인
+    ASSERT(offset % PGSIZE == 0);   // 파일 매핑의 시작 위치가 페이지 크기의 매수인지 확인
+
 	// 페이지 단위로 메모리 매핑
     while (read_bytes > 0 || zero_bytes > 0) {
 		// 현재 페이지에서 읽을 바이트와 0으로 채울 바이트 계산
