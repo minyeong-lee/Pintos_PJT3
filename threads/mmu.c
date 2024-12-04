@@ -55,6 +55,8 @@ pdpe_walk (uint64_t *pdpe, const uint64_t va, int create) {
 	return pte;
 }
 
+// TODO: SPT 관련 구조체와 함수 추가 필요
+
 /* Returns the address of the page table entry for virtual
  * address VADDR in page map level 4, pml4.
  * If PML4E does not have a page table for VADDR, behavior depends
@@ -92,12 +94,38 @@ pml4e_walk (uint64_t *pml4e, const uint64_t va, int create) {
  * virtual addresses, but none for user virtual addresses.
  * Returns the new page directory, or a null pointer if memory
  * allocation fails. */
+
+ // TODO: SPT를 함께 생성하고 초기화해야 한다. (palloc 사용)
 uint64_t *
 pml4_create (void) {
-	uint64_t *pml4 = palloc_get_page (0);
-	if (pml4)
-		memcpy (pml4, base_pml4, PGSIZE);
-	return pml4;
+	
+    uint64_t *pml4 = palloc_get_page (PAL_ZERO);
+    if (!pml4) {
+        return NULL;
+    }
+
+    memcpy (pml4, base_pml4, PGSIZE);
+        
+    // 현재 스레드의 SPT 초기화
+    struct thread *t = thread_current();
+    
+    // SPT가 이미 존재하면 제거
+    if (t->spt != NULL) {
+        supplemental_page_table_kill(t->spt);
+        free(t->spt);  // palloc_free_page 대신 free 사용
+        t->spt = NULL;
+    }
+    
+    // malloc으로 SPT 할당
+    t->spt = malloc(sizeof(struct supplemental_page_table));
+    if (!t->spt) {
+        palloc_free_page(pml4);
+        return NULL;
+    }
+
+    // SPT 초기화
+    supplemental_page_table_init(t->spt);
+    return pml4;
 }
 
 static bool
@@ -210,14 +238,20 @@ pml4_activate (uint64_t *pml4) {
  * address UADDR in pml4.  Returns the kernel virtual address
  * corresponding to that physical address, or a null pointer if
  * UADDR is unmapped. */
+
+// TODO: SPT 확인하여 페이지 상태 파악 필요
+
 void *
 pml4_get_page (uint64_t *pml4, const void *uaddr) {
+	// ! SPT 검색 코드 추가
 	ASSERT (is_user_vaddr (uaddr));
 
 	uint64_t *pte = pml4e_walk (pml4, (uint64_t) uaddr, 0);
 
 	if (pte && (*pte & PTE_P))
 		return ptov (PTE_ADDR (*pte)) + pg_ofs (uaddr);
+	
+	// ! 페이지 폴트 처리 코드 추가
 	return NULL;
 }
 
@@ -229,8 +263,12 @@ pml4_get_page (uint64_t *pml4, const void *uaddr) {
  * otherwise it is read-only.
  * Returns true if successful, false if memory allocation
  * failed. */
+
+// TODO: SPT에 페이지 정보 추가
+
 bool
 pml4_set_page (uint64_t *pml4, void *upage, void *kpage, bool rw) {
+	// ! SPT 업데이트 코드 추가
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (pg_ofs (kpage) == 0);
 	ASSERT (is_user_vaddr (upage));
@@ -247,8 +285,14 @@ pml4_set_page (uint64_t *pml4, void *upage, void *kpage, bool rw) {
  * directory PD.  Later accesses to the page will fault.  Other
  * bits in the page table entry are preserved.
  * UPAGE need not be mapped. */
+
+// TODO: SPT에서도 페이지 정보 제거 필요
+
 void
 pml4_clear_page (uint64_t *pml4, void *upage) {
+	
+	// ! SPT 업데이트 코드 추가
+
 	uint64_t *pte;
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (is_user_vaddr (upage));

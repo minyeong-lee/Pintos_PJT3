@@ -45,15 +45,36 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 /* Initalize the page on first fault */
 static bool
 uninit_initialize (struct page *page, void *kva) {
-	struct uninit_page *uninit = &page->uninit;
+    struct uninit_page *uninit = &page->uninit;
 
-	/* Fetch first, page_initialize may overwrite the values */
-	vm_initializer *init = uninit->init;
-	void *aux = uninit->aux;
+    /* Fetch first, page_initialize may overwrite the values */
+    vm_initializer *init = uninit->init;
+    void *aux = uninit->aux;
+    enum vm_type type = uninit->type;     /* Save original type */
 
-	/* TODO: You may need to fix this function. */
-	return uninit->page_initializer (page, uninit->type, kva) &&
-		(init ? init (page, aux) : true);
+    /* Check if type includes VM_ANON or VM_FILE flag */
+    if (VM_TYPE(type) == VM_ANON) {
+        if (!anon_initializer(page, type, kva)) {
+            goto err;
+        }
+    }
+    else if (VM_TYPE(type) == VM_FILE) {
+        if (!file_backed_initializer(page, type, kva)) {
+            goto err;
+        }
+    }
+    else {
+        PANIC ("Unsupported type for uninitialized page");
+    }
+
+    /* Call the provided initializer function if exists */
+    if (init != NULL && !init(page, aux)) {
+        goto err;
+    }
+
+    return true;
+err:
+    return false;
 }
 
 /* Free the resources hold by uninit_page. Although most of pages are transmuted
@@ -62,7 +83,22 @@ uninit_initialize (struct page *page, void *kva) {
  * PAGE will be freed by the caller. */
 static void
 uninit_destroy (struct page *page) {
-	struct uninit_page *uninit UNUSED = &page->uninit;
-	/* TODO: Fill this function.
-	 * TODO: If you don't have anything to do, just return. */
+    struct uninit_page *uninit = &page->uninit;
+
+    /* aux가 할당되어 있다면 해제 */
+    if (uninit->aux != NULL) {
+        // aux가 동적 할당된 메모리라면
+        free(uninit->aux);
+    }
+
+    /* 프레임이 있다면 해제 */
+    if (page->frame != NULL) {
+        if (page->frame->kva != NULL) {
+            palloc_free_page(page->frame->kva);
+        }
+        free(page->frame);
+    }
+
+    /* uninit 구조체 자체는 page의 일부이므로 여기서 해제하지 않음 */
+    /* page는 caller에 의해 해제될 것임 */
 }

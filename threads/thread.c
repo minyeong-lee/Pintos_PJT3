@@ -129,10 +129,10 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
-  list_init (&sleep_list);
+    list_init (&sleep_list);
 	list_init (&destruction_req);
-  list_init (&all_list);                                    //* MLFQS
-  load_avg = 0;                                             //* MLFQS
+    list_init (&all_list);                                    //* MLFQS
+    load_avg = 0;                                             //* MLFQS
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -149,7 +149,7 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
-
+	initial_thread -> saved_sp = NULL;
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
 
@@ -203,6 +203,7 @@ thread_print_stats (void) {
 tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
+        
 	struct thread *t;
 	tid_t tid;
 
@@ -210,34 +211,36 @@ thread_create (const char *name, int priority,
 
 	/* Allocate thread. */
 	t = palloc_get_page (PAL_ZERO);
-	if (t == NULL)
+	if (t == NULL) {
 		return TID_ERROR;
+	}
 
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 
-  tid = t->tid = allocate_tid ();
-  if (t != idle_thread) {                                   //* MLFQS
-    t->nice = thread_current ()->nice;
-    t->recent_cpu = thread_current ()->recent_cpu;
-    list_push_back(&all_list, &t->a_elem);
-  }
+    tid = t->tid = allocate_tid ();
+
+  	if (t != idle_thread) {
+        t->nice = thread_current ()->nice;
+        t->recent_cpu = thread_current ()->recent_cpu;
+        list_push_back(&all_list, &t->a_elem);
+    }
 
 #ifdef USERPROG
-  /* --- Project 2 : System call --- */
-  list_push_back(&thread_current ()->child_list, &t->c_elem);          //* FORK
+    t->fd_table = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+    if (t->fd_table == NULL) {
+        printf("Failed to allocate fd_table\n");
+        palloc_free_page(t);
+        return TID_ERROR;
+    }
 
-  t->fd_table = palloc_get_multiple(PAL_ZERO, FDT_PAGES);   //* FD
-  if (t->fd_table == NULL)
-    return TID_ERROR;
+    ASSERT(pg_ofs(t->fd_table) == 0);
 
-  t->fd_idx = 2;                                            //* FD
-  t->fd_table[0] = STDIN_FILENO;                            //* FD : stdin 배정 = 1
-  t->fd_table[1] = STDOUT_FILENO;                           //* FD : stdout 배정 = 2
+    t->fd_idx = 2;
+    t->fd_table[0] = STDIN_FILENO;
+    t->fd_table[1] = STDOUT_FILENO;
 #endif
 
-	/* Call the kernel_thread if it scheduled.
-	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
 	t->tf.R.rdi = (uint64_t) function;
 	t->tf.R.rsi = (uint64_t) aux;
@@ -247,11 +250,13 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
-	/* Add to run queue. */
 	thread_unblock (t);
   
-  if (!thread_mlfqs)
-    thread_preemption ();
+	if (!thread_mlfqs)
+    	thread_preemption ();
+
+	printf("Debug: fd_table[0]=%d, fd_table[1]=%d\n", 
+       t->fd_table[0], t->fd_table[1]);
 
 	return tid;
 }
@@ -259,20 +264,17 @@ thread_create (const char *name, int priority,
 //! 스레드 변경
 void
 thread_preemption (void) {
-  enum intr_level old_level;
-  struct thread *curr = thread_current ();
-  struct thread *ready = list_entry (list_begin (&ready_list), struct thread, elem);
-
-  if (list_empty(&ready_list))
-    return;
-
-  old_level = intr_disable ();
-
-  if (!intr_context() && curr->priority < ready->priority) {
-    thread_yield ();
-  }
-
-  intr_set_level (old_level);
+    enum intr_level old_level = intr_disable();
+    
+    if (!list_empty(&ready_list)) {
+        struct thread *curr = thread_current();
+        struct thread *ready = list_entry(list_begin(&ready_list), 
+                                        struct thread, elem);
+        if (!intr_context() && curr->priority < ready->priority)
+            thread_yield();
+    }
+    
+    intr_set_level(old_level);
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -307,8 +309,8 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-  if (t != idle_thread)
-    list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
+	if (t != idle_thread)
+		list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -316,40 +318,40 @@ thread_unblock (struct thread *t) {
 //! 스레드 재우기
 void
 thread_sleep (int64_t ticks) {
-  enum intr_level old_level;
-  struct thread *curr = thread_current ();
-  curr->waken_ticks = ticks;
+	enum intr_level old_level;
+	struct thread *curr = thread_current ();
+	curr->waken_ticks = ticks;
 
-  ASSERT (!intr_context ());
-  old_level = intr_disable();
+	ASSERT (!intr_context ());
+	old_level = intr_disable();
 
-  if (curr != idle_thread) {
-    list_push_back(&sleep_list, &curr->elem);
-  }
-  thread_block ();
-  intr_set_level (old_level);
+	if (curr != idle_thread) {
+		list_push_back(&sleep_list, &curr->elem);
+	}
+	thread_block ();
+	intr_set_level (old_level);
 }
 
 //! 스레드 깨우기
 void
 thread_wakeup(int64_t ticks) {
-  // 현재 ticks
-  // sleep_list 에는 미래의 ticks가 저장되어 있음
-  // if list_entry에서 값을 확인하고, 매 인터럽트마다 깨워야할 스레드가 있는지 확인해야함
-  struct list_elem *e = list_begin (&sleep_list);
+	// 현재 ticks
+	// sleep_list 에는 미래의 ticks가 저장되어 있음
+	// if list_entry에서 값을 확인하고, 매 인터럽트마다 깨워야할 스레드가 있는지 확인해야함
+	struct list_elem *e = list_begin (&sleep_list);
 
-  while (e != list_end (&sleep_list)) {
-    struct thread *chk_t = list_entry (e, struct thread, elem);
-    int64_t woke_ticks = chk_t->waken_ticks;
+	while (e != list_end (&sleep_list)) {
+		struct thread *chk_t = list_entry (e, struct thread, elem);
+		int64_t woke_ticks = chk_t->waken_ticks;
 
-    if (woke_ticks <= ticks) {
-      e = list_remove (e);
-      thread_unblock (chk_t);
-    }
-    else {
-      e = list_next(e);
-    }
-  }
+		if (woke_ticks <= ticks) {
+			e = list_remove (e);
+			thread_unblock (chk_t);
+		}
+		else {
+			e = list_next(e);
+		}
+	}
 }
 
 /* Returns the name of the running thread. */
@@ -427,20 +429,28 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	struct thread *curr = thread_current ();
-  curr->origin_priority = new_priority;
-
-  if (!thread_mlfqs) {
+    if (thread_mlfqs)
+        return;
+        
+    struct thread *curr = thread_current ();
+    curr->origin_priority = new_priority;
+    
     if (list_empty(&curr->donations))
-      curr->priority = new_priority;
-    else {
-      struct thread *t = list_entry (list_begin (&curr->donations), struct thread, d_elem);
-      if (t->priority < new_priority)
         curr->priority = new_priority;
+    else {
+        // 모든 donation을 검사하여 최대 우선순위 찾기
+        int max_priority = new_priority;
+        struct list_elem *e;
+        for (e = list_begin(&curr->donations); 
+             e != list_end(&curr->donations); 
+             e = list_next(e)) {
+            struct thread *t = list_entry(e, struct thread, d_elem);
+            if (t->priority > max_priority)
+                max_priority = t->priority;
+        }
+        curr->priority = max_priority;
     }
-
-    thread_preemption ();
-  }
+    thread_preemption();
 }
 
 /* 
@@ -608,17 +618,21 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
-  t->origin_priority = priority;
+    t->origin_priority = priority;
 	t->magic = THREAD_MAGIC;
-  list_init (&t->donations);
-  t->recent_cpu = 0;                                        //* MLFQS
-  t->nice = 0;                                              //* MLFQS
+    list_init (&t->donations);
+    t->recent_cpu = 0;                                        //* MLFQS
+    t->nice = 0;                                              //* MLFQS
 
 #ifdef USERPROG
-  list_init (&t->child_list);
-  sema_init(&t->wait_sema, 0);
-  sema_init(&t->load_sema, 0);
-  sema_init(&t->exit_sema, 0);
+	list_init (&t->child_list);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+#endif
+
+#ifdef VM
+	t->saved_sp = NULL;
 #endif
 }
 

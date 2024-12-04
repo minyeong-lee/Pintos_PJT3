@@ -110,6 +110,7 @@ struct thread {
   int recent_cpu;                     //* 내가 최근에 cpu를 점유한 틱
   int nice;                           //* 내가 다른 스레드들에게 얼마나 CPU를 양보했는지 (상대 지수)
 
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -132,7 +133,8 @@ struct thread {
 #endif
 #ifdef VM
   /* Table for whole virtual memory owned by thread. */
-  struct supplemental_page_table spt;
+  void *saved_sp;                     // ! 유저 모드의 스택 포인터를 저장한다.
+  struct supplemental_page_table *spt;
 #endif
 
 	/* Owned by thread.c. */

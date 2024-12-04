@@ -123,44 +123,60 @@ kill (struct intr_frame *f) {
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
 page_fault (struct intr_frame *f) {
-	bool not_present;  /* True: not-present page, false: writing r/o page. */
-	bool write;        /* True: access was write, false: access was read. */
-	bool user;         /* True: access by user, false: access by kernel. */
-	void *fault_addr;  /* Fault address. */
+    bool not_present;
+    bool write;
+    bool user;
+    void *fault_addr;
 
-	/* Obtain faulting address, the virtual address that was
-	   accessed to cause the fault.  It may point to code or to
-	   data.  It is not necessarily the address of the instruction
-	   that caused the fault (that's f->rip). */
+    /* Get the fault address ("cr2" register) */
+    fault_addr = (void *) rcr2();
+    intr_enable();
 
-	fault_addr = (void *) rcr2();
+    /* Determine cause. */
+    not_present = (f->error_code & PF_P) == 0;
+    write = (f->error_code & PF_W) != 0;
+    user = (f->error_code & PF_U) != 0;
 
-	/* Turn interrupts back on (they were only off so that we could
-	   be assured of reading CR2 before it changed). */
-	intr_enable ();
+    /* Count page faults. */
+    page_fault_cnt++;
 
-  exit(-1);                       //* exit
-	/* Determine cause. */
-	not_present = (f->error_code & PF_P) == 0;
-	write = (f->error_code & PF_W) != 0;
-	user = (f->error_code & PF_U) != 0;
+   //  printf("\n=== Detailed Page Fault Info ===\n");
+   //  printf("Error Code: %x\n", f->error_code);
+   //  printf("RIP (Instruction Pointer): %p\n", (void *)f->rip);
+   //  printf("RSP (Stack Pointer): %p\n", (void *)f->rsp);
+   //  printf("RAX: %p\n", (void *)f->R.rax);
+   //  printf("RBX: %p\n", (void *)f->R.rbx);
+   //  printf("Fault Address: %p\n", fault_addr);
+   //  printf("Thread name: %s\n", thread_current()->name);
+   //  printf("In %s mode\n", user ? "user" : "kernel");
+   //  printf("Access type: %s\n", write ? "write" : "read");
+   //  printf("Page %s\n", not_present ? "not present" : "protection violation");
 
 #ifdef VM
-	/* For project 3 and later. */
-	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
-		return;
+    if (!user) {
+        if (fault_addr == NULL) {
+            printf("NULL pointer access\n");
+            thread_exit();
+        }
+        
+        // 커널 모드에서는 현재 RSP를 saved_sp로 사용
+        thread_current()->saved_sp = (void *)f->rsp;
+        
+        if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
+            return;
+    } else {
+        thread_current()->saved_sp = f->rsp;
+        if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
+            return;
+    }
 #endif
 
-	/* Count page faults. */
-	page_fault_cnt++;
-
-	/* If the fault is true fault, show info and exit. */
-	printf ("Page fault at %p: %s error %s page in %s context.\n",
-			fault_addr,
-			not_present ? "not present" : "rights violation",
-			write ? "writing" : "reading",
-			user ? "user" : "kernel");
-	kill (f);
+    /* If the fault is true fault, show info and exit. */
+    printf("Fatal page fault - terminating.\n");
+    if (user)
+        exit(-1);
+    else
+        thread_exit();
 }
 
 //! ------------------------------ Project 2 ------------------------------ !//

@@ -139,6 +139,7 @@ list_rend (struct list *list) {
    */
 struct list_elem *
 list_head (struct list *list) {
+	// printf("Calling list_head with list: %p\n", list);
 	ASSERT (list != NULL);
 	return &list->head;
 }

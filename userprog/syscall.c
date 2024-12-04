@@ -37,95 +37,117 @@ void syscall_handler (struct intr_frame *);
 
 void
 syscall_init (void) {
-	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
-			((uint64_t)SEL_KCSEG) << 32);
-	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+  write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
+         ((uint64_t)SEL_KCSEG) << 32);
+  write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+
+  printf("Debug: Syscall handler initialized, entry point at %p\n", 
+         (void*)syscall_entry);
 
   lock_init(&filesys_lock);
 
-	/* The interrupt service rountine should not serve any interrupts
-	 * until the syscall_entry swaps the userland stack to the kernel
-	 * mode stack. Therefore, we masked the FLAG_FL. */
-	write_msr(MSR_SYSCALL_MASK,
-			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+  write_msr(MSR_SYSCALL_MASK,
+         FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
-/* The main system call interface */
-//! Project 2 - System calls
-void
-syscall_handler (struct intr_frame *f UNUSED) {
-  //? 시스템콜 호출 번호 - %rax
-  //? 인자 - %rdi, $rsi, %rdx, %r10, %r8, %r9
-
+void syscall_handler (struct intr_frame *f UNUSED) {
   int sys_number = f->R.rax;
+  
+  printf("Debug: System call %d invoked\n", sys_number);
+  thread_current()->saved_sp = f->rsp;
 
   switch (sys_number) {
-
-    case SYS_HALT:          /* 0 Halt the operating system. */
+    case SYS_HALT:          
+      printf("Debug: SYS_HALT(0) called\n");
       halt();
       break;
 
-    case SYS_EXIT:          /* 1 Terminate this process. */
+    case SYS_EXIT:          
+      printf("Debug: SYS_EXIT(1) called with status %d\n", f->R.rdi);
       exit(f->R.rdi);
       break;
 
-    case SYS_FORK:          /* 2 Clone current process. */
+    case SYS_FORK:          
+      printf("Debug: SYS_FORK(2) called with thread_name '%s'\n", (char *)f->R.rdi);
       f->R.rax = fork((char *)f->R.rdi, f);
       break;
 
-    case SYS_EXEC:          /* 3 Switch current process. */
+    case SYS_EXEC:         
+      printf("Debug: SYS_EXEC(3) called with cmd '%s'\n", (char *)f->R.rdi);
       f->R.rax = exec((char *)f->R.rdi);
       break;
 
-    case SYS_WAIT:          /* 4 Wait for a child process to die. */
+    case SYS_WAIT:         
+      printf("Debug: SYS_WAIT(4) called with pid %d\n", f->R.rdi);
       f->R.rax = wait(f->R.rdi);
       break;
 
-    case SYS_CREATE:        /* 5 Create a file. */
+    case SYS_CREATE:       
+      printf("Debug: SYS_CREATE(5) called with file '%s', size %zu\n", 
+             (char *)f->R.rdi, f->R.rsi);
       f->R.rax = create((char *)f->R.rdi, f->R.rsi);
       break;
 
-    case SYS_REMOVE:        /* 6 Delete a file. */
+    case SYS_REMOVE:        
+      printf("Debug: SYS_REMOVE(6) called with file '%s'\n", (char *)f->R.rdi);
       f->R.rax = remove((char *)f->R.rdi);
       break;
-    case SYS_OPEN:          /* 7 Open a file. */
+
+    case SYS_OPEN:          
+      printf("Debug: SYS_OPEN(7) called with file '%s'\n", (char *)f->R.rdi);
       f->R.rax = open((char *)f->R.rdi);
       break;
 
-    case SYS_FILESIZE:      /* 8 Obtain a file's size. */
+    case SYS_FILESIZE:      
+      printf("Debug: SYS_FILESIZE(8) called with fd %d\n", f->R.rdi);
       f->R.rax = filesize(f->R.rdi);
       break;
 
-    case SYS_READ:          /* 9 Read from a file. */
+    case SYS_READ:          
+      printf("Debug: SYS_READ(9) called with fd=%d, buffer=%p, size=%u\n",
+             f->R.rdi, (void *)f->R.rsi, f->R.rdx);
       f->R.rax = read(f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+      printf("Debug: SYS_READ returned %d\n", (int)f->R.rax);
       break;
 
-    case SYS_WRITE:         /* 10 Write to a file. */
+    case SYS_WRITE:         
+      printf("Debug: SYS_WRITE(10) called with fd=%d, buffer=%p, size=%u\n",
+             f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+      if (f->R.rdi == 1) {
+          printf("Debug: Writing to stdout, content: '%.20s...'\n", 
+                 (char *)f->R.rsi);
+      }
       f->R.rax = write(f->R.rdi, (void *)f->R.rsi, f->R.rdx);
+      printf("Debug: SYS_WRITE returned %d\n", (int)f->R.rax);
       break;
 
-    case SYS_SEEK:          /* 11 Change position in a file. */
+    case SYS_SEEK:          
+      printf("Debug: SYS_SEEK(11) called with fd=%d, position=%zu\n", 
+             f->R.rdi, f->R.rsi);
       seek(f->R.rdi, f->R.rsi);
       break;
 
-    case SYS_TELL:          /* 12 Report current position in a file. */
+    case SYS_TELL:          
+      printf("Debug: SYS_TELL(12) called with fd=%d\n", f->R.rdi);
       f->R.rax = tell(f->R.rdi);
       break;
 
-    case SYS_CLOSE:         /* 13 Close a file. */
+    case SYS_CLOSE:         
+      printf("Debug: SYS_CLOSE(13) called with fd=%d\n", f->R.rsi);
       close(f->R.rsi);
       break;
 
-    case SYS_DUP2:         /* 13 Close a file. */
+    case SYS_DUP2:         
+      printf("Debug: SYS_DUP2(14) called with oldfd=%d, newfd=%d\n", 
+             f->R.rdi, f->R.rsi);
       f->R.rax = dup2(f->R.rdi, f->R.rsi);
       break;
 
     default:
-      printf("system call!\n");
-      thread_exit ();
+      printf("Debug: Unknown system call %d!\n", sys_number);
+      thread_exit();
   }
 }
-
 //! ------------------------ Project 2 : Systemcall ------------------------ *//
 static void
 halt (void) {
@@ -242,30 +264,33 @@ read (int fd, void *buffer, unsigned length) {
 
 static int
 write (int fd, const void *buffer, unsigned length) {
-  int write_size = -1;
+    check_addr(buffer);
+    
+    if (fd >= FD_COUNT_LIMIT || fd < 0) {
+        printf("write: Invalid fd %d\n", fd);
+        return -1;
+    }
 
-  check_addr(buffer);
-  if (fd > FD_COUNT_LIMIT || fd <= 0)
-    return write_size;
+    if (fd == STDOUT_FILENO) {
+        printf("write: Writing %u bytes to stdout\n", length);
+        putbuf(buffer, length);
+        return length;
+    }
 
-  if (fd == 1) {
-    putbuf(buffer, length);
-    return 0;
-  }
-  else {
-    struct thread *curr = thread_current ();
+    // 파일에 대한 처리
+    struct thread *curr = thread_current();
     struct file *f = curr->fd_table[fd];
 
     if (f == NULL)
-      return write_size;
+        return -1;
 
     lock_acquire(&filesys_lock);
-    write_size = file_write(f, buffer, length);
+    int write_size = file_write(f, buffer, length);
     lock_release(&filesys_lock);
-  }
-  return write_size;
 
+    return write_size;
 }
+
 static void
 seek (int fd, unsigned position) {
   struct thread *curr = thread_current ();
